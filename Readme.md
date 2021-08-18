@@ -55,7 +55,8 @@ OPTIONS:
 
         --max-read-records <max-read-records>
             The number of records to infer the schema from. All rows if not present.
-            If max-read-records is set to zero, then the schema will infer all string types.
+            Setting max-read-records to zero, will stop schema inference.  All the columns
+            will be string typed.
 
         --max-row-group-size <max-row-group-size>                  Sets max size for a row group
         --max-statistics-size <max-statistics-size>
