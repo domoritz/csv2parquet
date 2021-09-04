@@ -46,6 +46,8 @@ struct Opts {
     output: PathBuf,
 
     /// The number of records to infer the schema from. All rows if not present.
+    /// Setting max-read-records to zero will stop schema inference.
+    /// All columns will be string typed.
     #[clap(long)]
     max_read_records: Option<usize>,
 
