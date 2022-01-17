@@ -40,8 +40,30 @@ checksum = "216c6846a292bdd93c2b93c1baab58c32ff50e2ab5e8d50db333ab518535dd8b"
 dependencies = [
  "bitflags",
  "chrono",
+ "flatbuffers",
+ "hex",
+ "indexmap",
+ "lazy_static",
+ "lexical-core",
+ "multiversion",
+ "num",
+ "regex",
+ "serde",
+ "serde_derive",
+ "serde_json",
+]
+
+[[package]]
+name = "arrow"
+version = "7.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "66ec0a5964feebf378e2fc6db9530e712657b8edf72aa17b1b277b0f52a48e2d"
+dependencies = [
+ "bitflags",
+ "chrono",
  "csv",
  "flatbuffers",
+ "half",
  "hex",
  "indexmap",
  "lazy_static",
@@ -216,7 +238,7 @@ dependencies = [
 name = "csv2parquet"
 version = "0.2.3"
 dependencies = [
- "arrow",
+ "arrow 7.0.0",
  "clap",
  "parquet",
  "serde_json",
@@ -255,6 +277,12 @@ dependencies = [
  "libc",
  "wasi",
 ]
+
+[[package]]
+name = "half"
+version = "1.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eabb4a44450da02c90444cf74558da904edde8fb4e9035a9a6a4e15445af0bd7"
 
 [[package]]
 name = "hashbrown"
@@ -574,7 +602,7 @@ version = "6.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "788d9953f4cfbe9db1beff7bebd54299d105e34680d78b82b1ddc85d432cac9d"
 dependencies = [
- "arrow",
+ "arrow 6.5.0",
  "base64",
  "brotli",
  "byteorder",
