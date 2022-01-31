@@ -57,6 +57,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "arrow"
+version = "8.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce240772a007c63658c1d335bb424fd1019b87895dee899b7bf70e85b2d24e5f"
+dependencies = [
+ "bitflags",
+ "chrono",
+ "flatbuffers",
+ "half",
+ "hex",
+ "indexmap",
+ "lazy_static",
+ "lexical-core",
+ "multiversion",
+ "num",
+ "regex",
+ "serde",
+ "serde_derive",
+ "serde_json",
+]
+
+[[package]]
 name = "atty"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -216,7 +238,7 @@ dependencies = [
 name = "csv2parquet"
 version = "0.2.3"
 dependencies = [
- "arrow",
+ "arrow 7.0.0",
  "clap",
  "parquet",
  "serde_json",
@@ -573,11 +595,11 @@ dependencies = [
 
 [[package]]
 name = "parquet"
-version = "7.0.0"
+version = "8.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c718575b34e488fa78d4f0286356abb8466573cb17ae8faa96ffd871ca6e8c6"
+checksum = "2d5a6492e0b849fd458bc9364aee4c8a9882b3cc21b2576767162725f69d2ad8"
 dependencies = [
- "arrow",
+ "arrow 8.0.0",
  "base64",
  "brotli",
  "byteorder",
