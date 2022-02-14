@@ -40,6 +40,28 @@ checksum = "ce240772a007c63658c1d335bb424fd1019b87895dee899b7bf70e85b2d24e5f"
 dependencies = [
  "bitflags",
  "chrono",
+ "flatbuffers",
+ "half",
+ "hex",
+ "indexmap",
+ "lazy_static",
+ "lexical-core",
+ "multiversion",
+ "num",
+ "regex",
+ "serde",
+ "serde_derive",
+ "serde_json",
+]
+
+[[package]]
+name = "arrow"
+version = "9.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "374ec8e5f39015ab754cfc63398a897423c877b66aecbfd036903b2c9c07f244"
+dependencies = [
+ "bitflags",
+ "chrono",
  "csv",
  "flatbuffers",
  "half",
@@ -216,7 +238,7 @@ dependencies = [
 name = "csv2parquet"
 version = "0.2.3"
 dependencies = [
- "arrow",
+ "arrow 9.0.2",
  "clap",
  "parquet",
  "serde_json",
@@ -577,7 +599,7 @@ version = "8.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2d5a6492e0b849fd458bc9364aee4c8a9882b3cc21b2576767162725f69d2ad8"
 dependencies = [
- "arrow",
+ "arrow 8.0.0",
  "base64",
  "brotli",
  "byteorder",
