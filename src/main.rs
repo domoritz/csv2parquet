@@ -6,9 +6,10 @@ use parquet::{
     errors::ParquetError,
     file::properties::WriterProperties,
 };
-use serde_json::to_string_pretty;
+use serde_json::{to_string_pretty, Value};
 use std::fs::File;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 #[derive(clap::ArgEnum, Clone)]
 #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
@@ -44,6 +45,23 @@ struct Opts {
     /// Output file.
     #[clap(name = "PARQUET", parse(from_os_str), value_hint = ValueHint::AnyPath)]
     output: PathBuf,
+
+    /// Arrow schema to be applied to data in CSV (same format as written out by -p / -n). {n}
+    /// {n}
+    /// If this value is supplied, no attempt will be made to infer a schema from the data. {n}
+    /// {n}
+    /// This feature may be useful to you if the inferred schema does not suit your needs (for example
+    /// the inference process favours defining large types for the schema where sometimes a smaller
+    /// type would suffice (i.e. using Int64 rather than a Uint16). {n}
+    /// {n}
+    /// For more detail about exactly how a schema may be structured, take a look at the source of
+    /// DataType fn from(json: &Value -> Result<DataType> in: {n}
+    /// {n}
+    /// https://github.com/apache/arrow-rs/blob/master/arrow/src/datatypes/datatype.rs {n}
+    /// {n}
+    /// Make sure to have the same number of columns in your schema file as are in your CSV!
+    #[clap(short = 's', long, parse(from_os_str), value_hint = ValueHint::AnyPath)]
+    schema_def_file: Option<PathBuf>,
 
     /// The number of records to infer the schema from. All rows if not present. Setting max-read-records to zero will stop schema inference and all columns will be string typed.
     #[clap(long)]
@@ -109,23 +127,65 @@ struct Opts {
 fn main() -> Result<(), ParquetError> {
     let opts: Opts = Opts::parse();
 
-    let input = File::open(opts.input)?;
+    let mut input = File::open(opts.input)?;
 
-    let mut builder = ReaderBuilder::new()
-        .has_header(opts.header.unwrap_or(true))
-        .with_delimiter(opts.delimiter as u8);
-    builder = builder.infer_schema(opts.max_read_records);
-
-    let reader = builder.build(input)?;
+    let schema = match opts.schema_def_file {
+        Some(schema_def_file_path) => {
+            // a schema definition file path has been provided, create schema from that
+            let schema_file = match File::open(&schema_def_file_path) {
+                Ok(file) => Ok(file),
+                Err(open_schema_file_err) => Err(ParquetError::General(format!(
+                    "Problem opening schema file: {:?}, message: {}",
+                    schema_def_file_path, open_schema_file_err
+                ))),
+            }?;
+            let json_read_result: serde_json::Result<Value> = serde_json::from_reader(schema_file);
+            match json_read_result {
+                Ok(schema_json) => match arrow::datatypes::Schema::from(&schema_json) {
+                    Ok(schema) => Ok(schema),
+                    Err(schema_err) => Err(ParquetError::ArrowError(schema_err.to_string())),
+                },
+                Err(err) => Err(ParquetError::General(format!(
+                    "Problem reading schema json: {}",
+                    err
+                ))),
+            }
+        }
+        _ => {
+            // infer schema from file contents
+            // NOTE: if max_read_records is zero then all cols are assumed to be "string"
+            match arrow::csv::reader::infer_file_schema(
+                &mut input,
+                opts.delimiter as u8,
+                opts.max_read_records,
+                opts.header.unwrap_or(true),
+            ) {
+                Ok((schema, _inferred_has_header)) => Ok(schema),
+                Err(infer_schema_err) => Err(ParquetError::General(format!(
+                    "Problem inferring schema: {}",
+                    infer_schema_err
+                ))),
+            }
+        }
+    }?;
 
     if opts.print_schema || opts.dry {
-        let json: String = to_string_pretty(&reader.schema().to_json()).unwrap();
-        eprintln!("Inferred Schema:\n{}", json);
-
+        let json: String = to_string_pretty(&schema.to_json()).unwrap();
+        eprintln!("Schema:");
+        println!("{}", json);
         if opts.dry {
             return Ok(());
         }
     }
+
+    //let reader = builder.build(input)?;
+    let schema_ref = Arc::new(schema);
+    let builder = ReaderBuilder::new()
+        .has_header(opts.header.unwrap_or(true))
+        .with_delimiter(opts.delimiter as u8)
+        .with_schema(schema_ref);
+
+    let reader = builder.build(input)?;
 
     let output = File::create(opts.output)?;
 
