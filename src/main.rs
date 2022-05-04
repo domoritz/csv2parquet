@@ -135,7 +135,7 @@ fn main() -> Result<(), ParquetError> {
             let schema_file = match File::open(&schema_def_file_path) {
                 Ok(file) => Ok(file),
                 Err(open_schema_file_err) => Err(ParquetError::General(format!(
-                    "Problem opening schema file: {:?}, message: {}",
+                    "Error opening schema file: {:?}, message: {}",
                     schema_def_file_path, open_schema_file_err
                 ))),
             }?;
