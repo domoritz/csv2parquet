@@ -162,7 +162,7 @@ fn main() -> Result<(), ParquetError> {
             ) {
                 Ok((schema, _inferred_has_header)) => Ok(schema),
                 Err(infer_schema_err) => Err(ParquetError::General(format!(
-                    "Problem inferring schema: {}",
+                    "Error inferring schema: {}",
                     infer_schema_err
                 ))),
             }
