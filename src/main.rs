@@ -46,20 +46,10 @@ struct Opts {
     #[clap(name = "PARQUET", parse(from_os_str), value_hint = ValueHint::AnyPath)]
     output: PathBuf,
 
-    /// Arrow schema to be applied to data in CSV (same format as written out by -p / -n). {n}
-    /// {n}
-    /// If this value is supplied, no attempt will be made to infer a schema from the data. {n}
-    /// {n}
-    /// This feature may be useful to you if the inferred schema does not suit your needs (for example
-    /// the inference process favours defining large types for the schema where sometimes a smaller
-    /// type would suffice (i.e. using Int64 rather than a Uint16). {n}
-    /// {n}
-    /// For more detail about exactly how a schema may be structured, take a look at the source of
-    /// DataType fn from(json: &Value -> Result<DataType> in: {n}
-    /// {n}
-    /// https://github.com/apache/arrow-rs/blob/master/arrow/src/datatypes/datatype.rs {n}
-    /// {n}
-    /// Make sure to have the same number of columns in your schema file as are in your CSV!
+    /// Arrow schema to be applied to data in CSV (same format as written out by -p / -n), prevents schema inference from running.
+    /// The structure of schema json is shown in the source of: DataType fn from(json: &Value -> Result<DataType> in:
+    /// https://github.com/apache/arrow-rs/blob/master/arrow/src/datatypes/datatype.rs
+    /// Make sure your schema has the same number of columns as your CSV!
     #[clap(short = 's', long, parse(from_os_str), value_hint = ValueHint::AnyPath)]
     schema_def_file: Option<PathBuf>,
 
@@ -131,11 +121,10 @@ fn main() -> Result<(), ParquetError> {
 
     let schema = match opts.schema_def_file {
         Some(schema_def_file_path) => {
-            // a schema definition file path has been provided, create schema from that
             let schema_file = match File::open(&schema_def_file_path) {
                 Ok(file) => Ok(file),
                 Err(open_schema_file_err) => Err(ParquetError::General(format!(
-                    "Problem opening schema file: {:?}, message: {}",
+                    "Error opening schema file: {:?}, message: {}",
                     schema_def_file_path, open_schema_file_err
                 ))),
             }?;
@@ -146,14 +135,12 @@ fn main() -> Result<(), ParquetError> {
                     Err(schema_err) => Err(ParquetError::ArrowError(schema_err.to_string())),
                 },
                 Err(err) => Err(ParquetError::General(format!(
-                    "Problem reading schema json: {}",
+                    "Error reading schema json: {}",
                     err
                 ))),
             }
         }
         _ => {
-            // infer schema from file contents
-            // NOTE: if max_read_records is zero then all cols are assumed to be "string"
             match arrow::csv::reader::infer_file_schema(
                 &mut input,
                 opts.delimiter as u8,
@@ -162,7 +149,7 @@ fn main() -> Result<(), ParquetError> {
             ) {
                 Ok((schema, _inferred_has_header)) => Ok(schema),
                 Err(infer_schema_err) => Err(ParquetError::General(format!(
-                    "Problem inferring schema: {}",
+                    "Error inferring schema: {}",
                     infer_schema_err
                 ))),
             }
