@@ -146,7 +146,7 @@ fn main() -> Result<(), ParquetError> {
                     Err(schema_err) => Err(ParquetError::ArrowError(schema_err.to_string())),
                 },
                 Err(err) => Err(ParquetError::General(format!(
-                    "Problem reading schema json: {}",
+                    "Error reading schema json: {}",
                     err
                 ))),
             }
