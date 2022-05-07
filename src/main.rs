@@ -132,7 +132,7 @@ fn main() -> Result<(), ParquetError> {
             match json_read_result {
                 Ok(schema_json) => match arrow::datatypes::Schema::from(&schema_json) {
                     Ok(schema) => Ok(schema),
-                    Err(schema_err) => Err(ParquetError::ArrowError(schema_err.to_string())),
+                    Err(error) => Err(error.into()),
                 },
                 Err(err) => Err(ParquetError::General(format!(
                     "Error reading schema json: {}",
