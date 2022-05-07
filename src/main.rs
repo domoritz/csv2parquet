@@ -148,9 +148,9 @@ fn main() -> Result<(), ParquetError> {
                 opts.header.unwrap_or(true),
             ) {
                 Ok((schema, _inferred_has_header)) => Ok(schema),
-                Err(infer_schema_err) => Err(ParquetError::General(format!(
+                Err(error) => Err(ParquetError::General(format!(
                     "Error inferring schema: {}",
-                    infer_schema_err
+                    error
                 ))),
             }
         }
