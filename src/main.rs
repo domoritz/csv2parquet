@@ -123,9 +123,9 @@ fn main() -> Result<(), ParquetError> {
         Some(schema_def_file_path) => {
             let schema_file = match File::open(&schema_def_file_path) {
                 Ok(file) => Ok(file),
-                Err(open_schema_file_err) => Err(ParquetError::General(format!(
+                Err(error) => Err(ParquetError::General(format!(
                     "Error opening schema file: {:?}, message: {}",
-                    schema_def_file_path, open_schema_file_err
+                    schema_def_file_path, error
                 ))),
             }?;
             let json_read_result: serde_json::Result<Value> = serde_json::from_reader(schema_file);
