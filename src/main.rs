@@ -165,7 +165,6 @@ fn main() -> Result<(), ParquetError> {
         }
     }
 
-    //let reader = builder.build(input)?;
     let schema_ref = Arc::new(schema);
     let builder = ReaderBuilder::new()
         .has_header(opts.header.unwrap_or(true))
