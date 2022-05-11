@@ -46,10 +46,9 @@ struct Opts {
     #[clap(name = "PARQUET", parse(from_os_str), value_hint = ValueHint::AnyPath)]
     output: PathBuf,
 
-    /// Arrow schema to be applied to data in CSV (same format as written out by -p / -n), prevents schema inference from running.
-    /// The structure of schema json is shown in the source of: DataType fn from(json: &Value -> Result<DataType> in:
-    /// https://github.com/apache/arrow-rs/blob/master/arrow/src/datatypes/datatype.rs
-    /// Make sure your schema has the same number of columns as your CSV!
+    /// Specify a file that contains an Arrow schema to be applied to source data. The schema should be in the same format as written by -p / -n.
+    /// When a schema file is defined, no attempt will be made to infer a schema.
+    /// The structure of schema JSON is shown in the source of: DataType fn from(json: &Value -> Result<DataType> in: https://github.com/apache/arrow-rs/blob/master/arrow/src/datatypes/datatype.rs
     #[clap(short = 's', long, parse(from_os_str), value_hint = ValueHint::AnyPath)]
     schema_def_file: Option<PathBuf>,
 
