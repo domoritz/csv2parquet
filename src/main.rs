@@ -46,9 +46,7 @@ struct Opts {
     #[clap(name = "PARQUET", parse(from_os_str), value_hint = ValueHint::AnyPath)]
     output: PathBuf,
 
-    /// Specify a file that contains an Arrow schema to be applied to source data. The schema should be in the same format as written by -p / -n.
-    /// When a schema file is defined, no attempt will be made to infer a schema.
-    /// The structure of schema JSON is shown in the source of: DataType fn from(json: &Value -> Result<DataType> in: https://github.com/apache/arrow-rs/blob/master/arrow/src/datatypes/datatype.rs
+    /// File with Arrow schema in JSON format.
     #[clap(short = 's', long, parse(from_os_str), value_hint = ValueHint::AnyPath)]
     schema_file: Option<PathBuf>,
 
