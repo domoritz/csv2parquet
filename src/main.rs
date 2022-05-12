@@ -127,7 +127,7 @@ fn main() -> Result<(), ParquetError> {
                     schema_def_file_path, error
                 ))),
             }?;
-            let json_read_result: serde_json::Result<Value> = serde_json::from_reader(schema_file);
+            let json: serde_json::Result<Value> = serde_json::from_reader(schema_file);
             match json_read_result {
                 Ok(schema_json) => match arrow::datatypes::Schema::from(&schema_json) {
                     Ok(schema) => Ok(schema),
