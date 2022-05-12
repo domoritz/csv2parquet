@@ -116,7 +116,7 @@ fn main() -> Result<(), ParquetError> {
 
     let mut input = File::open(opts.input)?;
 
-    let schema = match opts.schema_def_file {
+    let schema = match opts.schema_file {
         Some(schema_def_file_path) => {
             let schema_file = match File::open(&schema_def_file_path) {
                 Ok(file) => Ok(file),
@@ -126,7 +126,7 @@ fn main() -> Result<(), ParquetError> {
                 ))),
             }?;
             let json: serde_json::Result<Value> = serde_json::from_reader(schema_file);
-            match json_read_result {
+            match json {
                 Ok(schema_json) => match arrow::datatypes::Schema::from(&schema_json) {
                     Ok(schema) => Ok(schema),
                     Err(error) => Err(error.into()),
