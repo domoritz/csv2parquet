@@ -50,7 +50,7 @@ struct Opts {
     /// When a schema file is defined, no attempt will be made to infer a schema.
     /// The structure of schema JSON is shown in the source of: DataType fn from(json: &Value -> Result<DataType> in: https://github.com/apache/arrow-rs/blob/master/arrow/src/datatypes/datatype.rs
     #[clap(short = 's', long, parse(from_os_str), value_hint = ValueHint::AnyPath)]
-    schema_def_file: Option<PathBuf>,
+    schema_file: Option<PathBuf>,
 
     /// The number of records to infer the schema from. All rows if not present. Setting max-read-records to zero will stop schema inference and all columns will be string typed.
     #[clap(long)]
