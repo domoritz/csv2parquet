@@ -87,7 +87,6 @@ OPTIONS:
 ```
 
 The --schema-file option uses the same file format as --dry and --print-schema. Additional information about the format 
-may be gleaned by inspecting "fn from(json: &Value)" and "fn to_json(&self)" in the [Arrow DataType source code](https://github.com/apache/arrow-rs/blob/master/arrow/src/datatypes/datatype.rs).
 
 ## For Developers
 
