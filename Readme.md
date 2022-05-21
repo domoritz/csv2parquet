@@ -86,7 +86,7 @@ OPTIONS:
             Sets write batch size
 ```
 
-The --schema-file option uses the same file format as --dry and --print-schema. Additional information about the format 
+The --schema-file option uses the same file format as --dry and --print-schema.
 
 ## For Developers
 
