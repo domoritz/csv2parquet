@@ -11,7 +11,7 @@ description = "Convert CSV files to Parquet"
 
 [dependencies]
 parquet = "19.0.0"
-arrow = "19.0.0"
+arrow = "20.0.0"
 serde_json = "1.0.83"
 clap = { version = "3.2.17", features = ["derive"] }
 
