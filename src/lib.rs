@@ -1,6 +1,7 @@
 use arrow::csv;
 use arrow::datatypes::Schema;
 use arrow::error::ArrowError;
+use arrow::ipc::writer as arrow_writer;
 use arrow::json;
 use arrow::record_batch::RecordBatch;
 use clap::{Parser, ValueHint};
@@ -139,6 +140,9 @@ pub struct ParquetOpts {
     #[clap(long)]
     max_statistics_size: Option<usize>,
 }
+
+#[derive(clap::Args)]
+pub struct ArrowOpts;
 
 pub fn run<I, O>() -> Result<(), ArrowError>
 where
@@ -384,5 +388,25 @@ impl OutputFormat for ParquetOpts {
 
     fn close(&self, writer: Self::Writer) -> arrow::error::Result<()> {
         writer.close().map(|_| ()).map_err(|err| err.into())
+    }
+}
+
+impl OutputFormat for ArrowOpts {
+    type Writer = arrow_writer::FileWriter<File>;
+
+    fn try_new_writer(
+        &self,
+        output: File,
+        schema_ref: Arc<Schema>,
+    ) -> arrow::error::Result<Self::Writer> {
+        arrow_writer::FileWriter::try_new(output, schema_ref.as_ref())
+    }
+
+    fn write(&self, writer: &mut Self::Writer, batch: &RecordBatch) -> arrow::error::Result<()> {
+        writer.write(batch)
+    }
+
+    fn close(&self, _writer: Self::Writer) -> arrow::error::Result<()> {
+        Ok(())
     }
 }
