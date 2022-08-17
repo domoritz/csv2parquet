@@ -1,6 +1,8 @@
 use arrow::csv;
 use arrow::datatypes::Schema;
+use arrow::error::ArrowError;
 use arrow::json;
+use arrow::record_batch::RecordBatch;
 use clap::{Parser, ValueHint};
 use parquet::{
     arrow::ArrowWriter,
@@ -10,6 +12,7 @@ use parquet::{
 };
 use serde_json::{to_string_pretty, Value};
 use std::fs::File;
+use std::io::BufReader;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -48,7 +51,7 @@ enum ParquetEnabledStatistics {
 
 #[derive(Parser)]
 #[clap(version = env!("CARGO_PKG_VERSION"), author = "Dominik Moritz <domoritz@cmu.edu>")]
-struct Opts<F: clap::Args> {
+struct Opts<T: clap::Args> {
     /// Input file.
     #[clap(name = "INPUT", parse(from_os_str), value_hint = ValueHint::AnyPath)]
     input: PathBuf,
@@ -67,7 +70,7 @@ struct Opts<F: clap::Args> {
 
     /// Options specific to the input format we're parsing
     #[clap(flatten)]
-    format_options: F,
+    input_format: T,
 
     /// Set the compression.
     #[clap(short, long, arg_enum)]
@@ -118,8 +121,12 @@ struct Opts<F: clap::Args> {
     dry: bool,
 }
 
-fn main() -> Result<(), ParquetError> {
-    let opts: Opts<CsvOpts> = Opts::parse();
+pub fn run<T>() -> Result<(), ParquetError>
+    where T: clap::Args,
+          T: ReadFormat,
+          <T as ReadFormat>::Reader: Iterator<Item = Result<RecordBatch, ArrowError>>
+{
+    let opts: Opts<T> = Opts::parse();
 
     let mut input = File::open(&opts.input.as_path())?;
 
@@ -145,8 +152,8 @@ fn main() -> Result<(), ParquetError> {
             }
         }
         _ => {
-            match opts.infer_file_schema(&mut input) {
-                Ok((schema, _inferred_has_header)) => Ok(schema),
+            match opts.input_format.infer_file_schema(opts.max_read_records, &mut input) {
+                Ok(schema) => Ok(schema),
                 Err(error) => Err(ParquetError::General(format!(
                     "Error inferring schema: {}",
                     error
@@ -166,7 +173,7 @@ fn main() -> Result<(), ParquetError> {
 
     let schema_ref = Arc::new(schema);
 
-    let reader = opts.make_reader(schema_ref, input)?;
+    let reader = opts.input_format.make_reader(schema_ref.clone(), input)?;
 
     let output = File::create(opts.output)?;
 
@@ -238,7 +245,10 @@ fn main() -> Result<(), ParquetError> {
         props = props.set_max_statistics_size(size);
     }
 
-    let mut writer = ArrowWriter::try_new(output, reader.schema(), Some(props.build()))?;
+    let mut writer =
+        ArrowWriter::try_new(output,
+                             schema_ref,
+                             Some(props.build()))?;
 
     for batch in reader {
         match batch {
@@ -254,19 +264,21 @@ fn main() -> Result<(), ParquetError> {
 }
 
 
-trait ReadFormat {
+pub trait ReadFormat {
     type Reader;
 
-    fn infer_file_schema(&self, input: &mut File)
-                         -> arrow::error::Result<(Schema, usize)>;
+    fn infer_file_schema(&self,
+                         max_read_records: Option<usize>,
+                         input: &mut File)
+                         -> arrow::error::Result<Schema>;
 
     fn make_reader(&self, schema_ref: Arc<Schema>, input: File)
                    -> arrow::error::Result<Self::Reader>;
 }
 
 
-#[derive(clap::Args, Clone)]
-struct CsvOpts {
+#[derive(clap::Args)]
+pub struct CsvOpts {
     /// Set whether the CSV file has headers
     #[clap(short, long)]
     header: Option<bool>,
@@ -276,18 +288,20 @@ struct CsvOpts {
     delimiter: char
 }
 
-impl ReadFormat for Opts<CsvOpts> {
+impl ReadFormat for CsvOpts {
     type Reader = csv::Reader<File>;
 
-    fn infer_file_schema(&self, input: &mut File)
-                         -> arrow::error::Result<(Schema, usize)>
+    fn infer_file_schema(&self,
+                         max_read_records: Option<usize>,
+                         input: &mut File)
+                         -> arrow::error::Result<Schema>
     {
         csv::reader::infer_file_schema(
             input,
-            self.format_options.delimiter as u8,
-            self.max_read_records,
-            self.format_options.header.unwrap_or(true)
-        )
+            self.delimiter as u8,
+            max_read_records,
+            self.header.unwrap_or(true)
+        ).map(|(s, _)| s)
     }
 
 
@@ -295,10 +309,33 @@ impl ReadFormat for Opts<CsvOpts> {
                    -> arrow::error::Result<csv::Reader<File>>
     {
         let builder = csv::ReaderBuilder::new()
-            .has_header(self.format_options.header.unwrap_or(true))
-            .with_delimiter(self.format_options.delimiter as u8)
+            .has_header(self.header.unwrap_or(true))
+            .with_delimiter(self.delimiter as u8)
             .with_schema(schema_ref);
         builder.build(input)
     }
 }
 
+
+#[derive(clap::Args)]
+pub struct JsonOpts;
+
+impl ReadFormat for JsonOpts {
+    type Reader = json::Reader<File>;
+
+    fn infer_file_schema(&self,
+                         max_read_records: Option<usize>,
+                         input: &mut File)
+        -> arrow::error::Result<Schema>
+    {
+        let mut buf = BufReader::new(input);
+        json::reader::infer_json_schema_from_seekable(&mut buf, max_read_records)
+    }
+
+    fn make_reader(&self, schema_ref: Arc<Schema>, input: File)
+                   -> arrow::error::Result<Self::Reader>
+    {
+        let builder = json::ReaderBuilder::new().with_schema(schema_ref);
+        builder.build(input)
+    }
+}

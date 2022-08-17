@@ -1,11 +1,11 @@
 [package]
-name = "csv2parquet"
+name = "to-parquet"
 version = "0.4.0"
 authors = ["Dominik Moritz <domoritz@cmu.edu>"]
 license = "MIT/Apache-2.0"
 edition = "2018"
 repository = "https://github.com/domoritz/csv2parquet"
-description = "Convert CSV files to Parquet"
+description = "Convert CSV or JSON files to Parquet"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

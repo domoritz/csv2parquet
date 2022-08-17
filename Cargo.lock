@@ -238,16 +238,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "csv2parquet"
-version = "0.4.0"
-dependencies = [
- "arrow",
- "clap",
- "parquet",
- "serde_json",
-]
-
-[[package]]
 name = "flatbuffers"
 version = "2.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -863,6 +853,16 @@ dependencies = [
  "log",
  "ordered-float",
  "threadpool",
+]
+
+[[package]]
+name = "to-parquet"
+version = "0.4.0"
+dependencies = [
+ "arrow",
+ "clap",
+ "parquet",
+ "serde_json",
 ]
 
 [[package]]
