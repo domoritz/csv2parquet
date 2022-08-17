@@ -48,7 +48,6 @@ enum ParquetEnabledStatistics {
     Page,
 }
 
-
 #[derive(Parser)]
 #[clap(version = env!("CARGO_PKG_VERSION"), author = "Dominik Moritz <domoritz@cmu.edu>")]
 struct Opts<T: clap::Args> {
@@ -122,9 +121,10 @@ struct Opts<T: clap::Args> {
 }
 
 pub fn run<T>() -> Result<(), ParquetError>
-    where T: clap::Args,
-          T: ReadFormat,
-          <T as ReadFormat>::Reader: Iterator<Item = Result<RecordBatch, ArrowError>>
+where
+    T: clap::Args,
+    T: ReadFormat,
+    <T as ReadFormat>::Reader: Iterator<Item = Result<RecordBatch, ArrowError>>,
 {
     let opts: Opts<T> = Opts::parse();
 
@@ -152,7 +152,10 @@ pub fn run<T>() -> Result<(), ParquetError>
             }
         }
         _ => {
-            match opts.input_format.infer_file_schema(opts.max_read_records, &mut input) {
+            match opts
+                .input_format
+                .infer_file_schema(opts.max_read_records, &mut input)
+            {
                 Ok(schema) => Ok(schema),
                 Err(error) => Err(ParquetError::General(format!(
                     "Error inferring schema: {}",
@@ -245,10 +248,7 @@ pub fn run<T>() -> Result<(), ParquetError>
         props = props.set_max_statistics_size(size);
     }
 
-    let mut writer =
-        ArrowWriter::try_new(output,
-                             schema_ref,
-                             Some(props.build()))?;
+    let mut writer = ArrowWriter::try_new(output, schema_ref, Some(props.build()))?;
 
     for batch in reader {
         match batch {
@@ -263,19 +263,21 @@ pub fn run<T>() -> Result<(), ParquetError>
     }
 }
 
-
 pub trait ReadFormat {
     type Reader;
 
-    fn infer_file_schema(&self,
-                         max_read_records: Option<usize>,
-                         input: &mut File)
-                         -> arrow::error::Result<Schema>;
+    fn infer_file_schema(
+        &self,
+        max_read_records: Option<usize>,
+        input: &mut File,
+    ) -> arrow::error::Result<Schema>;
 
-    fn make_reader(&self, schema_ref: Arc<Schema>, input: File)
-                   -> arrow::error::Result<Self::Reader>;
+    fn make_reader(
+        &self,
+        schema_ref: Arc<Schema>,
+        input: File,
+    ) -> arrow::error::Result<Self::Reader>;
 }
-
 
 #[derive(clap::Args)]
 pub struct CsvOpts {
@@ -285,29 +287,31 @@ pub struct CsvOpts {
 
     /// Set the CSV file's column delimiter as a byte character.
     #[clap(short, long, default_value = ",")]
-    delimiter: char
+    delimiter: char,
 }
 
 impl ReadFormat for CsvOpts {
     type Reader = csv::Reader<File>;
 
-    fn infer_file_schema(&self,
-                         max_read_records: Option<usize>,
-                         input: &mut File)
-                         -> arrow::error::Result<Schema>
-    {
+    fn infer_file_schema(
+        &self,
+        max_read_records: Option<usize>,
+        input: &mut File,
+    ) -> arrow::error::Result<Schema> {
         csv::reader::infer_file_schema(
             input,
             self.delimiter as u8,
             max_read_records,
-            self.header.unwrap_or(true)
-        ).map(|(s, _)| s)
+            self.header.unwrap_or(true),
+        )
+        .map(|(s, _)| s)
     }
 
-
-    fn make_reader(&self, schema_ref: Arc<Schema>, input: File)
-                   -> arrow::error::Result<csv::Reader<File>>
-    {
+    fn make_reader(
+        &self,
+        schema_ref: Arc<Schema>,
+        input: File,
+    ) -> arrow::error::Result<csv::Reader<File>> {
         let builder = csv::ReaderBuilder::new()
             .has_header(self.header.unwrap_or(true))
             .with_delimiter(self.delimiter as u8)
@@ -316,25 +320,26 @@ impl ReadFormat for CsvOpts {
     }
 }
 
-
 #[derive(clap::Args)]
 pub struct JsonOpts;
 
 impl ReadFormat for JsonOpts {
     type Reader = json::Reader<File>;
 
-    fn infer_file_schema(&self,
-                         max_read_records: Option<usize>,
-                         input: &mut File)
-        -> arrow::error::Result<Schema>
-    {
+    fn infer_file_schema(
+        &self,
+        max_read_records: Option<usize>,
+        input: &mut File,
+    ) -> arrow::error::Result<Schema> {
         let mut buf = BufReader::new(input);
         json::reader::infer_json_schema_from_seekable(&mut buf, max_read_records)
     }
 
-    fn make_reader(&self, schema_ref: Arc<Schema>, input: File)
-                   -> arrow::error::Result<Self::Reader>
-    {
+    fn make_reader(
+        &self,
+        schema_ref: Arc<Schema>,
+        input: File,
+    ) -> arrow::error::Result<Self::Reader> {
         let builder = json::ReaderBuilder::new().with_schema(schema_ref);
         builder.build(input)
     }
