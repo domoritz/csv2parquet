@@ -1,4 +1,6 @@
-use arrow::csv::ReaderBuilder;
+use arrow::csv;
+use arrow::datatypes::Schema;
+use arrow::json;
 use clap::{Parser, ValueHint};
 use parquet::{
     arrow::ArrowWriter,
@@ -43,11 +45,12 @@ enum ParquetEnabledStatistics {
     Page,
 }
 
+
 #[derive(Parser)]
 #[clap(version = env!("CARGO_PKG_VERSION"), author = "Dominik Moritz <domoritz@cmu.edu>")]
-struct Opts {
-    /// Input CSV file.
-    #[clap(name = "CSV", parse(from_os_str), value_hint = ValueHint::AnyPath)]
+struct Opts<F: clap::Args> {
+    /// Input file.
+    #[clap(name = "INPUT", parse(from_os_str), value_hint = ValueHint::AnyPath)]
     input: PathBuf,
 
     /// Output file.
@@ -62,13 +65,9 @@ struct Opts {
     #[clap(long)]
     max_read_records: Option<usize>,
 
-    /// Set whether the CSV file has headers
-    #[clap(short, long)]
-    header: Option<bool>,
-
-    /// Set the CSV file's column delimiter as a byte character.
-    #[clap(short, long, default_value = ",")]
-    delimiter: char,
+    /// Options specific to the input format we're parsing
+    #[clap(flatten)]
+    format_options: F,
 
     /// Set the compression.
     #[clap(short, long, arg_enum)]
@@ -120,13 +119,13 @@ struct Opts {
 }
 
 fn main() -> Result<(), ParquetError> {
-    let opts: Opts = Opts::parse();
+    let opts: Opts<CsvOpts> = Opts::parse();
 
-    let mut input = File::open(opts.input)?;
+    let mut input = File::open(&opts.input.as_path())?;
 
-    let schema = match opts.schema_file {
+    let schema = match &opts.schema_file {
         Some(schema_def_file_path) => {
-            let schema_file = match File::open(&schema_def_file_path) {
+            let schema_file = match File::open(&schema_def_file_path.as_path()) {
                 Ok(file) => Ok(file),
                 Err(error) => Err(ParquetError::General(format!(
                     "Error opening schema file: {:?}, message: {}",
@@ -146,12 +145,7 @@ fn main() -> Result<(), ParquetError> {
             }
         }
         _ => {
-            match arrow::csv::reader::infer_file_schema(
-                &mut input,
-                opts.delimiter as u8,
-                opts.max_read_records,
-                opts.header.unwrap_or(true),
-            ) {
+            match opts.infer_file_schema(&mut input) {
                 Ok((schema, _inferred_has_header)) => Ok(schema),
                 Err(error) => Err(ParquetError::General(format!(
                     "Error inferring schema: {}",
@@ -171,12 +165,8 @@ fn main() -> Result<(), ParquetError> {
     }
 
     let schema_ref = Arc::new(schema);
-    let builder = ReaderBuilder::new()
-        .has_header(opts.header.unwrap_or(true))
-        .with_delimiter(opts.delimiter as u8)
-        .with_schema(schema_ref);
 
-    let reader = builder.build(input)?;
+    let reader = opts.make_reader(schema_ref, input)?;
 
     let output = File::create(opts.output)?;
 
@@ -262,3 +252,53 @@ fn main() -> Result<(), ParquetError> {
         Err(error) => Err(error),
     }
 }
+
+
+trait ReadFormat {
+    type Reader;
+
+    fn infer_file_schema(&self, input: &mut File)
+                         -> arrow::error::Result<(Schema, usize)>;
+
+    fn make_reader(&self, schema_ref: Arc<Schema>, input: File)
+                   -> arrow::error::Result<Self::Reader>;
+}
+
+
+#[derive(clap::Args, Clone)]
+struct CsvOpts {
+    /// Set whether the CSV file has headers
+    #[clap(short, long)]
+    header: Option<bool>,
+
+    /// Set the CSV file's column delimiter as a byte character.
+    #[clap(short, long, default_value = ",")]
+    delimiter: char
+}
+
+impl ReadFormat for Opts<CsvOpts> {
+    type Reader = csv::Reader<File>;
+
+    fn infer_file_schema(&self, input: &mut File)
+                         -> arrow::error::Result<(Schema, usize)>
+    {
+        csv::reader::infer_file_schema(
+            input,
+            self.format_options.delimiter as u8,
+            self.max_read_records,
+            self.format_options.header.unwrap_or(true)
+        )
+    }
+
+
+    fn make_reader(&self, schema_ref: Arc<Schema>, input: File)
+                   -> arrow::error::Result<csv::Reader<File>>
+    {
+        let builder = csv::ReaderBuilder::new()
+            .has_header(self.format_options.header.unwrap_or(true))
+            .with_delimiter(self.format_options.delimiter as u8)
+            .with_schema(schema_ref);
+        builder.build(input)
+    }
+}
+
