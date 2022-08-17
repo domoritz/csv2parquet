@@ -1,6 +1,6 @@
-use parquet::errors::ParquetError;
-use to_parquet::CsvOpts;
+use arrow::error::ArrowError;
+use to_parquet::{CsvOpts, ParquetOpts};
 
-fn main() -> Result<(), ParquetError> {
-    to_parquet::run::<CsvOpts>()
+fn main() -> Result<(), ArrowError> {
+    to_parquet::run::<CsvOpts, ParquetOpts>()
 }

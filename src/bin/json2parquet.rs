@@ -1,6 +1,6 @@
-use parquet::errors::ParquetError;
-use to_parquet::JsonOpts;
+use arrow::error::ArrowError;
+use to_parquet::{JsonOpts, ParquetOpts};
 
-fn main() -> Result<(), ParquetError> {
-    to_parquet::run::<JsonOpts>()
+fn main() -> Result<(), ArrowError> {
+    to_parquet::run::<JsonOpts, ParquetOpts>()
 }

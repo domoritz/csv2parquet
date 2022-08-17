@@ -7,7 +7,6 @@ use clap::{Parser, ValueHint};
 use parquet::{
     arrow::ArrowWriter,
     basic::{Compression, Encoding},
-    errors::ParquetError,
     file::properties::{EnabledStatistics, WriterProperties},
 };
 use serde_json::{to_string_pretty, Value};
@@ -50,13 +49,13 @@ enum ParquetEnabledStatistics {
 
 #[derive(Parser)]
 #[clap(version = env!("CARGO_PKG_VERSION"), author = "Dominik Moritz <domoritz@cmu.edu>")]
-struct Opts<T: clap::Args> {
+struct Opts<I: clap::Args, O: clap::Args> {
     /// Input file.
     #[clap(name = "INPUT", parse(from_os_str), value_hint = ValueHint::AnyPath)]
     input: PathBuf,
 
     /// Output file.
-    #[clap(name = "PARQUET", parse(from_os_str), value_hint = ValueHint::AnyPath)]
+    #[clap(name = "OUTPUT", parse(from_os_str), value_hint = ValueHint::AnyPath)]
     output: PathBuf,
 
     /// File with Arrow schema in JSON format.
@@ -69,8 +68,37 @@ struct Opts<T: clap::Args> {
 
     /// Options specific to the input format we're parsing
     #[clap(flatten)]
-    input_format: T,
+    input_format: I,
 
+    /// Options specific to the output format we're writing
+    #[clap(flatten)]
+    output_format: O,
+
+    /// Print the schema to stderr.
+    #[clap(short, long)]
+    print_schema: bool,
+
+    /// Only print the schema
+    #[clap(short = 'n', long)]
+    dry: bool,
+}
+
+#[derive(clap::Args)]
+pub struct CsvOpts {
+    /// Set whether the CSV file has headers
+    #[clap(short, long)]
+    header: Option<bool>,
+
+    /// Set the CSV file's column delimiter as a byte character.
+    #[clap(short, long, default_value = ",")]
+    delimiter: char,
+}
+
+#[derive(clap::Args)]
+pub struct JsonOpts;
+
+#[derive(clap::Args)]
+pub struct ParquetOpts {
     /// Set the compression.
     #[clap(short, long, arg_enum)]
     compression: Option<ParquetCompression>,
@@ -110,23 +138,17 @@ struct Opts<T: clap::Args> {
     /// Sets max statistics size for any column. Applicable only if statistics are enabled.
     #[clap(long)]
     max_statistics_size: Option<usize>,
-
-    /// Print the schema to stderr.
-    #[clap(short, long)]
-    print_schema: bool,
-
-    /// Only print the schema
-    #[clap(short = 'n', long)]
-    dry: bool,
 }
 
-pub fn run<T>() -> Result<(), ParquetError>
+pub fn run<I, O>() -> Result<(), ArrowError>
 where
-    T: clap::Args,
-    T: ReadFormat,
-    <T as ReadFormat>::Reader: Iterator<Item = Result<RecordBatch, ArrowError>>,
+    I: clap::Args,
+    I: InputFormat,
+    <I as InputFormat>::Reader: Iterator<Item = Result<RecordBatch, ArrowError>>,
+    O: clap::Args,
+    O: OutputFormat,
 {
-    let opts: Opts<T> = Opts::parse();
+    let opts: Opts<I, O> = Opts::parse();
 
     let mut input = File::open(&opts.input.as_path())?;
 
@@ -134,7 +156,7 @@ where
         Some(schema_def_file_path) => {
             let schema_file = match File::open(&schema_def_file_path.as_path()) {
                 Ok(file) => Ok(file),
-                Err(error) => Err(ParquetError::General(format!(
+                Err(error) => Err(ArrowError::IoError(format!(
                     "Error opening schema file: {:?}, message: {}",
                     schema_def_file_path, error
                 ))),
@@ -143,9 +165,9 @@ where
             match json {
                 Ok(schema_json) => match arrow::datatypes::Schema::from(&schema_json) {
                     Ok(schema) => Ok(schema),
-                    Err(error) => Err(error.into()),
+                    Err(error) => Err(error),
                 },
-                Err(err) => Err(ParquetError::General(format!(
+                Err(err) => Err(ArrowError::IoError(format!(
                     "Error reading schema json: {}",
                     err
                 ))),
@@ -157,7 +179,7 @@ where
                 .infer_file_schema(opts.max_read_records, &mut input)
             {
                 Ok(schema) => Ok(schema),
-                Err(error) => Err(ParquetError::General(format!(
+                Err(error) => Err(ArrowError::SchemaError(format!(
                     "Error inferring schema: {}",
                     error
                 ))),
@@ -180,90 +202,22 @@ where
 
     let output = File::create(opts.output)?;
 
-    let mut props = WriterProperties::builder().set_dictionary_enabled(opts.dictionary);
-
-    if let Some(statistics) = opts.statistics {
-        let statistics = match statistics {
-            ParquetEnabledStatistics::Chunk => EnabledStatistics::Chunk,
-            ParquetEnabledStatistics::Page => EnabledStatistics::Page,
-            ParquetEnabledStatistics::None => EnabledStatistics::None,
-        };
-
-        props = props.set_statistics_enabled(statistics);
-    }
-
-    if let Some(compression) = opts.compression {
-        let compression = match compression {
-            ParquetCompression::UNCOMPRESSED => Compression::UNCOMPRESSED,
-            ParquetCompression::SNAPPY => Compression::SNAPPY,
-            ParquetCompression::GZIP => Compression::GZIP,
-            ParquetCompression::LZO => Compression::LZO,
-            ParquetCompression::BROTLI => Compression::BROTLI,
-            ParquetCompression::LZ4 => Compression::LZ4,
-            ParquetCompression::ZSTD => Compression::ZSTD,
-        };
-
-        props = props.set_compression(compression);
-    }
-
-    if let Some(encoding) = opts.encoding {
-        let encoding = match encoding {
-            ParquetEncoding::PLAIN => Encoding::PLAIN,
-            ParquetEncoding::RLE => Encoding::RLE,
-            ParquetEncoding::BIT_PACKED => Encoding::BIT_PACKED,
-            ParquetEncoding::DELTA_BINARY_PACKED => Encoding::DELTA_BINARY_PACKED,
-            ParquetEncoding::DELTA_LENGTH_BYTE_ARRAY => Encoding::DELTA_LENGTH_BYTE_ARRAY,
-            ParquetEncoding::DELTA_BYTE_ARRAY => Encoding::DELTA_BYTE_ARRAY,
-            ParquetEncoding::RLE_DICTIONARY => Encoding::RLE_DICTIONARY,
-        };
-
-        props = props.set_encoding(encoding);
-    }
-
-    if let Some(size) = opts.write_batch_size {
-        props = props.set_write_batch_size(size);
-    }
-
-    if let Some(size) = opts.data_pagesize_limit {
-        props = props.set_data_pagesize_limit(size);
-    }
-
-    if let Some(size) = opts.dictionary_pagesize_limit {
-        props = props.set_dictionary_pagesize_limit(size);
-    }
-
-    if let Some(size) = opts.dictionary_pagesize_limit {
-        props = props.set_dictionary_pagesize_limit(size);
-    }
-
-    if let Some(size) = opts.max_row_group_size {
-        props = props.set_max_row_group_size(size);
-    }
-
-    if let Some(created_by) = opts.created_by {
-        props = props.set_created_by(created_by);
-    }
-
-    if let Some(size) = opts.max_statistics_size {
-        props = props.set_max_statistics_size(size);
-    }
-
-    let mut writer = ArrowWriter::try_new(output, schema_ref, Some(props.build()))?;
+    let mut writer = opts.output_format.try_new_writer(output, schema_ref)?;
 
     for batch in reader {
         match batch {
-            Ok(batch) => writer.write(&batch)?,
-            Err(error) => return Err(error.into()),
+            Ok(batch) => opts.output_format.write(&mut writer, &batch)?,
+            Err(error) => return Err(error),
         }
     }
 
-    match writer.close() {
+    match opts.output_format.close(writer) {
         Ok(_) => Ok(()),
         Err(error) => Err(error),
     }
 }
 
-pub trait ReadFormat {
+pub trait InputFormat {
     type Reader;
 
     fn infer_file_schema(
@@ -279,18 +233,7 @@ pub trait ReadFormat {
     ) -> arrow::error::Result<Self::Reader>;
 }
 
-#[derive(clap::Args)]
-pub struct CsvOpts {
-    /// Set whether the CSV file has headers
-    #[clap(short, long)]
-    header: Option<bool>,
-
-    /// Set the CSV file's column delimiter as a byte character.
-    #[clap(short, long, default_value = ",")]
-    delimiter: char,
-}
-
-impl ReadFormat for CsvOpts {
+impl InputFormat for CsvOpts {
     type Reader = csv::Reader<File>;
 
     fn infer_file_schema(
@@ -320,10 +263,7 @@ impl ReadFormat for CsvOpts {
     }
 }
 
-#[derive(clap::Args)]
-pub struct JsonOpts;
-
-impl ReadFormat for JsonOpts {
+impl InputFormat for JsonOpts {
     type Reader = json::Reader<File>;
 
     fn infer_file_schema(
@@ -342,5 +282,107 @@ impl ReadFormat for JsonOpts {
     ) -> arrow::error::Result<Self::Reader> {
         let builder = json::ReaderBuilder::new().with_schema(schema_ref);
         builder.build(input)
+    }
+}
+
+pub trait OutputFormat {
+    type Writer;
+
+    fn try_new_writer(
+        &self,
+        output: File,
+        schema_ref: Arc<Schema>,
+    ) -> arrow::error::Result<Self::Writer>;
+
+    fn write(&self, writer: &mut Self::Writer, batch: &RecordBatch) -> arrow::error::Result<()>;
+
+    fn close(&self, writer: Self::Writer) -> arrow::error::Result<()>;
+}
+
+impl OutputFormat for ParquetOpts {
+    type Writer = ArrowWriter<File>;
+
+    fn try_new_writer(
+        &self,
+        output: File,
+        schema_ref: Arc<Schema>,
+    ) -> arrow::error::Result<Self::Writer> {
+        let mut props = WriterProperties::builder().set_dictionary_enabled(self.dictionary);
+
+        if let Some(statistics) = &self.statistics {
+            let statistics = match statistics {
+                ParquetEnabledStatistics::Chunk => EnabledStatistics::Chunk,
+                ParquetEnabledStatistics::Page => EnabledStatistics::Page,
+                ParquetEnabledStatistics::None => EnabledStatistics::None,
+            };
+
+            props = props.set_statistics_enabled(statistics);
+        }
+
+        if let Some(compression) = &self.compression {
+            let compression = match compression {
+                ParquetCompression::UNCOMPRESSED => Compression::UNCOMPRESSED,
+                ParquetCompression::SNAPPY => Compression::SNAPPY,
+                ParquetCompression::GZIP => Compression::GZIP,
+                ParquetCompression::LZO => Compression::LZO,
+                ParquetCompression::BROTLI => Compression::BROTLI,
+                ParquetCompression::LZ4 => Compression::LZ4,
+                ParquetCompression::ZSTD => Compression::ZSTD,
+            };
+
+            props = props.set_compression(compression);
+        }
+
+        if let Some(encoding) = &self.encoding {
+            let encoding = match encoding {
+                ParquetEncoding::PLAIN => Encoding::PLAIN,
+                ParquetEncoding::RLE => Encoding::RLE,
+                ParquetEncoding::BIT_PACKED => Encoding::BIT_PACKED,
+                ParquetEncoding::DELTA_BINARY_PACKED => Encoding::DELTA_BINARY_PACKED,
+                ParquetEncoding::DELTA_LENGTH_BYTE_ARRAY => Encoding::DELTA_LENGTH_BYTE_ARRAY,
+                ParquetEncoding::DELTA_BYTE_ARRAY => Encoding::DELTA_BYTE_ARRAY,
+                ParquetEncoding::RLE_DICTIONARY => Encoding::RLE_DICTIONARY,
+            };
+
+            props = props.set_encoding(encoding);
+        }
+
+        if let Some(size) = self.write_batch_size {
+            props = props.set_write_batch_size(size);
+        }
+
+        if let Some(size) = self.data_pagesize_limit {
+            props = props.set_data_pagesize_limit(size);
+        }
+
+        if let Some(size) = self.dictionary_pagesize_limit {
+            props = props.set_dictionary_pagesize_limit(size);
+        }
+
+        if let Some(size) = self.dictionary_pagesize_limit {
+            props = props.set_dictionary_pagesize_limit(size);
+        }
+
+        if let Some(size) = self.max_row_group_size {
+            props = props.set_max_row_group_size(size);
+        }
+
+        if let Some(created_by) = &self.created_by {
+            props = props.set_created_by(created_by.clone());
+        }
+
+        if let Some(size) = self.max_statistics_size {
+            props = props.set_max_statistics_size(size);
+        }
+
+        ArrowWriter::try_new(output, schema_ref, Some(props.build())).map_err(|err| err.into())
+    }
+
+    fn write(&self, writer: &mut Self::Writer, batch: &RecordBatch) -> arrow::error::Result<()> {
+        writer.write(batch).map_err(|err| err.into())
+    }
+
+    fn close(&self, writer: Self::Writer) -> arrow::error::Result<()> {
+        writer.close().map(|_| ()).map_err(|err| err.into())
     }
 }
