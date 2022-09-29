@@ -90,6 +90,7 @@ OPTIONS:
 The --schema-file option uses the same file format as --dry and --print-schema.
 
 ## Examples
+
 ### Convert a CSV to Parquet
 ```bash
 csv2parquet data.csv data.parquet
