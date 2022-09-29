@@ -106,7 +106,9 @@ csv2parquet --header true --dry <CSV> <PARQUET>
 ```
 
 ### Convert a CSV using `schema-file` to PARQUET
-- Below is an example of the `schema-file` content:
+
+Below is an example of the `schema-file` content:
+
 ```json
 {
   "fields": [
