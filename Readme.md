@@ -96,7 +96,7 @@ The --schema-file option uses the same file format as --dry and --print-schema.
 csv2parquet data.csv data.parquet
 ```
 
-### Convert a CSV with no `header` to PARQUET
+### Convert a CSV with no `header` to Parquet
 ```bash
 csv2parquet --header false <CSV> <PARQUET>
 ```
@@ -106,7 +106,7 @@ csv2parquet --header false <CSV> <PARQUET>
 csv2parquet --header true --dry <CSV> <PARQUET>
 ```
 
-### Convert a CSV using `schema-file` to PARQUET
+### Convert a CSV using `schema-file` to Parquet
 
 Below is an example of the `schema-file` content:
 
