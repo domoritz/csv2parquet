@@ -127,7 +127,8 @@ csv2parquet --header true --dry <CSV> <PARQUET>
   ]
 }
 ```
-- Then add the schema-file `schema.json` in the command:
+
+Then add the schema-file `schema.json` in the command:
 ```
 csv2parquet --header false --schema-file schema.json <CSV> <PARQUET>
 ```
