@@ -1,5 +1,7 @@
 # CSV to Parquet
 
+**This repo is archived and the code moved to [Arrow CLI Tools](https://github.com/domoritz/arrow-tools).**
+
 [![Crates.io](https://img.shields.io/crates/v/csv2parquet.svg)](https://crates.io/crates/csv2parquet)
 [![Rust](https://github.com/domoritz/csv2parquet/actions/workflows/rust.yml/badge.svg)](https://github.com/domoritz/csv2parquet/actions/workflows/rust.yml)
 
